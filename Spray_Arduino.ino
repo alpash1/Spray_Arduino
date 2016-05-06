@@ -1,6 +1,6 @@
 //Checks whether the serial message has been fully transcoded
-boolean stringComplete = false;
-String inputString = "";
+boolean messageReceived = false;
+char json[200];
 
 //The pins of the spray valves
 int sprayGas = 13;  
@@ -23,9 +23,7 @@ int delayRinse_Air;
 
 void setup() {
   //Setup the serial connection
-  Serial.begin(9600);
-  // reserve 200 bytes for the inputString:
-  inputString.reserve(200);  
+  Serial.begin(9600);  
 
   // initialize digital spray pins as outputs.
   pinMode(sprayGas, OUTPUT);
@@ -38,14 +36,13 @@ void setup() {
 
 void loop() {
   // print the string when a newline arrives:
-  if (stringComplete) {
-    Serial.println(inputString);
-    setSettings(inputString);
-    Serial.println(delayRinse_Air);
+  if (messageReceived) {
+    Serial.print(json);
+    //setSettings(json);
     runSprayProgram(); 
-    // clear the string:
-    inputString = "";
-    stringComplete = false;
+
+    //Set the message received to false:
+    messageReceived = false;
   }  
 }
 
@@ -94,15 +91,7 @@ void spray(int sprayName, int onTime) {
  */
 void serialEvent() {
   while (Serial.available()) {
-    // get the new byte:
-    char inChar = (char)Serial.read(); 
-    // add it to the inputString:
-    inputString += inChar;
-    // if the incoming character is a newline, set a flag
-    // so the main loop can do something about it:
-    if (inChar == '\n') {
-      stringComplete = true;
-    } 
+   Serial.readBytesUntil('@', json, 200);
+   messageReceived = true;
   }
 }
-

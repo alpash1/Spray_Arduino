@@ -1,6 +1,9 @@
+#include <ArduinoJson.h>
+
 //Checks whether the serial message has been fully transcoded
 boolean messageReceived = false;
 char json[200];
+StaticJsonBuffer<200> jsonBuffer;
 
 //The pins of the spray valves
 int sprayGas = 13;  
@@ -8,18 +11,23 @@ int sprayPilot = 12;
 
 int sprayAlkali = 7;
 int sprayRinse = 5;
-int sprayAirblade = 3;
+int sprayAir = 3;
+
+//The number of layers
+int noOfLayers = 0;
 
 //The spray lengths
 int sprayTimeQD = 400;
 int sprayTimeAlkali = 1000;
 int sprayTimeRinse = 4000;
+int sprayTimeAir = 10000;
 
 //The delays between sprays
 int delayGas_Pilot = 100;
 int delayQD_Alkali = 3000;
 int delayAlkali_Rinse = 1000;
-int delayRinse_Air;
+int delayRinse_Air = 500;
+int delayAir_QD = 1000;
 
 void setup() {
   //Setup the serial connection
@@ -30,7 +38,7 @@ void setup() {
   pinMode(sprayPilot, OUTPUT);
   pinMode(sprayAlkali, OUTPUT);
   pinMode(sprayRinse, OUTPUT);
-  pinMode(sprayAirblade, OUTPUT);
+  pinMode(sprayAir, OUTPUT);
 }
 
 
@@ -38,8 +46,12 @@ void loop() {
   // print the string when a newline arrives:
   if (messageReceived) {
     Serial.print(json);
-    //setSettings(json);
-    runSprayProgram(); 
+    
+    JsonObject& root = jsonBuffer.parseObject(json);
+    
+    setSettings(root);
+    
+    for (int i=0; i < noOfLayers; i++) runSprayProgram(); 
 
     //Set the message received to false:
     messageReceived = false;
@@ -47,13 +59,16 @@ void loop() {
 }
 
 //Set the settings via the Raspberry Pi
-void setSettings(String settingsString) {
-  sprayTimeQD = settingsString[0] - '0';
-  delayQD_Alkali = settingsString[1] - '0';
-  sprayTimeAlkali = settingsString[2] - '0';
-  delayAlkali_Rinse = settingsString[3] - '0';
-  sprayTimeRinse = settingsString[4] - '0';
-  delayRinse_Air = settingsString[5] - '0';  
+void setSettings(JsonObject& jsonSettings) {
+  noOfLayers= jsonSettings["noOfLayers"];
+  sprayTimeQD = jsonSettings["durationQD"];
+  delayQD_Alkali = jsonSettings["pauseQD"];
+  sprayTimeAlkali = jsonSettings["durationAlkali"];
+  delayAlkali_Rinse = jsonSettings["pauseAlkali"];
+  sprayTimeRinse = jsonSettings["durationWash"];
+  delayRinse_Air = jsonSettings["pauseWash"];
+  sprayTimeAir = jsonSettings["durationAir"];
+  delayAir_QD = jsonSettings["pauseAir"];
 }
 
 //Run the spray program
@@ -64,6 +79,8 @@ void runSprayProgram() {
   delay(delayAlkali_Rinse);
   spray(sprayRinse, sprayTimeRinse);
   delay(delayRinse_Air);
+  spray(sprayAir, sprayTimeAir);
+  delay(delayAir_QD);
 }
 
 

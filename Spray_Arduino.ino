@@ -6,12 +6,12 @@ char json[200];
 StaticJsonBuffer<200> jsonBuffer;
 
 //The pins of the spray valves
-int sprayGas = 13;  
+int sprayGas = 10;  
 int sprayPilot = 12;
 
 int sprayAlkali = 7;
 int sprayRinse = 5;
-int sprayAir = 3;
+int sprayAir = 2;
 
 //The number of layers
 int noOfLayers = 0;
@@ -41,6 +41,8 @@ void setup() {
   pinMode(sprayAir, OUTPUT);
 }
 
+void(* resetFunc) (void) = 0;//declare reset function at address 0
+
 
 void loop() {
   // print the string when a newline arrives:
@@ -55,6 +57,7 @@ void loop() {
 
     //Set the message received to false:
     messageReceived = false;
+    resetFunc();
   }  
 }
 

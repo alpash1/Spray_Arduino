@@ -81,7 +81,7 @@ void loop() {
 }
 
 
-//Set the settings via the Raspberry Pi
+//Extracts the spray settings received over serial from the JSON object, and sets the Arduino spray settings based on them
 void setSettings(JsonObject& jsonSettings) {
   noOfLayers= jsonSettings["noOfLayers"];
   sprayTimeQD = jsonSettings["durationQD"];
@@ -94,7 +94,7 @@ void setSettings(JsonObject& jsonSettings) {
   delayAir_QD = jsonSettings["pauseAir"];
 }
 
-//Run the spray program
+//Runs the spray program (ie a single spray cycle)
 void runSprayProgram() {
   sprayQD(pinSprayGas, pinSprayPilot, sprayTimeQD);
   delay(delayQD_Alkali);

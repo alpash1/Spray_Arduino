@@ -1,59 +1,140 @@
-//The pins of the spray valves
-int sprayGas = 13;  
-int sprayPilot = 12;
+#include <ArduinoJson.h>
 
-int sprayAlkali = 7;
-int sprayRinse = 5;
-int sprayAirblade = 3;
+/*The Arduino pins which control each of the spray valves*/
+const int pinSprayGas = 10;  
+const int pinSprayPilot = 12;
+const int pinSprayAlkali = 7;
+const int pinSprayRinse = 5;
+const int pinSprayAir = 2;
 
-//The spray lengths
+
+/*Variables for handling JSON message arrival*/
+char json[200];
+StaticJsonBuffer<200> jsonBuffer;
+
+//Checks whether the serial message has been fully transcoded
+boolean messageReceived = false;
+
+
+/*Variables for the spray settings, with initial default values set*/
+
+//The number of layers to be sprayed (one layer per spray cycle)
+int noOfLayers = 0;
+
+//The length of spraying time for each nozzle, in milliseconds
 int sprayTimeQD = 400;
 int sprayTimeAlkali = 1000;
 int sprayTimeRinse = 4000;
+int sprayTimeAir = 10000;
 
-//The delays between sprays
+//The delay between the gas line switching on and the pilot line switching on, in milliseconds
 int delayGas_Pilot = 100;
+
+//The delay between the end of one spray and the start of the next, in milliseconds
 int delayQD_Alkali = 3000;
 int delayAlkali_Rinse = 1000;
-int delayRinse_Air;
+int delayRinse_Air = 500;
+int delayAir_QD = 1000;
 
+/*--------------------------------------------------------------------------*/
+
+//Initialises the Arduino for serial communication and configures the pins
 void setup() {
-  // initialize digital spray pins as outputs.
-  pinMode(sprayGas, OUTPUT);
-  pinMode(sprayPilot, OUTPUT);
-  pinMode(sprayAlkali, OUTPUT);
-  pinMode(sprayRinse, OUTPUT);
-  pinMode(sprayAirblade, OUTPUT);
+  //Setup the serial connection
+  Serial.begin(9600);
+  Serial.print("hello");  
+
+  //Initialise digital spray pins as outputs
+  pinMode(pinSprayGas, OUTPUT);
+  pinMode(pinSprayPilot, OUTPUT);
+  pinMode(pinSprayAlkali, OUTPUT);
+  pinMode(pinSprayRinse, OUTPUT);
+  pinMode(pinSprayAir, OUTPUT);
 }
 
 
+//Enables Arduino to reset itself
+void(* resetFunc) (void) = 0;
+
+//The main loop of the Arduino
 void loop() {
- runSprayProgram(); 
+  
+  if (messageReceived) {
+    //Prints the message received to Serial
+    Serial.print(json);
+
+    //Parses the message into a JSON object
+    JsonObject& root = jsonBuffer.parseObject(json);
+
+    //Extracts the settings from the JSON object and sets the spray settings based on the info
+    setSettings(root);
+
+    //Runs the spray cycle until the desired number of layers has been reached
+    for (int i=0; i < noOfLayers; i++) runSprayProgram(); 
+
+    //Sets the message received to false
+    messageReceived = false;
+
+    //Resets the Arduino as it can hang here
+    resetFunc();
+  }  
 }
 
+
+//Set the settings via the Raspberry Pi
+void setSettings(JsonObject& jsonSettings) {
+  noOfLayers= jsonSettings["noOfLayers"];
+  sprayTimeQD = jsonSettings["durationQD"];
+  delayQD_Alkali = jsonSettings["pauseQD"];
+  sprayTimeAlkali = jsonSettings["durationAlkali"];
+  delayAlkali_Rinse = jsonSettings["pauseAlkali"];
+  sprayTimeRinse = jsonSettings["durationWash"];
+  delayRinse_Air = jsonSettings["pauseWash"];
+  sprayTimeAir = jsonSettings["durationAir"];
+  delayAir_QD = jsonSettings["pauseAir"];
+}
 
 //Run the spray program
 void runSprayProgram() {
-  sprayQD(sprayGas, sprayPilot, sprayTimeQD);
+  sprayQD(pinSprayGas, pinSprayPilot, sprayTimeQD);
   delay(delayQD_Alkali);
-  spray(sprayAlkali, sprayTimeAlkali);
+  spray(pinSprayAlkali, sprayTimeAlkali);
   delay(delayAlkali_Rinse);
-  spray(sprayRinse, sprayTimeRinse);
+  spray(pinSprayRinse, sprayTimeRinse);
   delay(delayRinse_Air);
+  spray(pinSprayAir, sprayTimeAir);
+  delay(delayAir_QD);
 }
 
 
 //Turns on the nozzle for the quantum dots, taking into account the pilot air line
-void sprayQD(int sprayAirName, int sprayPilotName, int sprayTime) {
-  digitalWrite(sprayAirName, HIGH);
+void sprayQD(int pinSprayName, int pinSprayPilotName, int sprayTime) {
+  digitalWrite(pinSprayName, HIGH);
   delay(delayGas_Pilot);
-  spray(sprayPilotName, sprayTime);
-  digitalWrite(sprayAirName, LOW);
+  spray(pinSprayPilotName, sprayTime);
+  digitalWrite(pinSprayName, LOW);
 }
 
 //Turns a spray on for a particular amount of time
-void spray(int sprayName, int onTime) {
-  digitalWrite(sprayName, HIGH);
+void spray(int pinSprayName, int onTime) {
+  digitalWrite(pinSprayName, HIGH);
   delay(onTime);
-  digitalWrite(sprayName, LOW);
+  digitalWrite(pinSprayName, LOW);
+}
+
+
+/*----------------------------------------------------
+  SerialEvent occurs whenever a new data comes in the
+ hardware serial RX.  This routine is run between each
+ time loop() runs, so using delay inside loop can delay
+ response.  Multiple bytes of data may be available.
+ */
+void serialEvent() {
+  while (Serial.available()) {
+   //Stops reading the message when an @ symbol is read
+   Serial.readBytesUntil('@', json, 200);
+
+   //Sets the messageReceived variable to true so that the main program loop is executed
+   messageReceived = true;
+  }
 }
